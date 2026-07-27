@@ -1,0 +1,65 @@
+import pandas as pd
+import numpy as np
+from sklearn.model_selection import train_test_split
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.metrics import roc_auc_score
+from sklearn.preprocessing import LabelEncoder
+import warnings
+warnings.filterwarnings('ignore')
+
+# 1. 固定路径和参数
+DATA_PATH = './data/'  # 指向你刚才放数据的data文件夹
+RANDOM_SEED = 42
+
+print("正在加载数据...")
+
+# 2. 读取数据
+train = pd.read_csv(DATA_PATH + 'train.csv')
+test = pd.read_csv(DATA_PATH + 'test.csv')
+
+print(f"训练集大小: {train.shape}, 测试集大小: {test.shape}")
+
+# 3. 处理类别特征 (Geography, Gender)
+for col in ['Geography', 'Gender']:
+    le = LabelEncoder()
+    train[col] = le.fit_transform(train[col].astype(str))
+    test[col] = le.transform(test[col].astype(str))
+
+# 4. 分离特征和标签
+X_train = train.drop(['id', 'Exited'], axis=1)
+y_train = train['Exited']
+X_test = test.drop(['id'], axis=1)
+
+# 5. 只保留纯数值列（确保模型能处理）
+X_train = X_train.select_dtypes(include=[np.number])
+X_test = X_test.select_dtypes(include=[np.number])
+
+print(f"训练特征数: {X_train.shape[1]}")
+
+# 6. 划分验证集（用来看看模型效果）
+X_tr, X_val, y_tr, y_val = train_test_split(
+    X_train, y_train, test_size=0.2, random_state=RANDOM_SEED, stratify=y_train
+)
+
+# 7. 训练随机森林模型
+print("开始训练模型（大约需要30秒）...")
+model = RandomForestClassifier(n_estimators=200, max_depth=10, random_state=RANDOM_SEED, n_jobs=-1)
+model.fit(X_tr, y_tr)
+
+# 8. 验证集评估
+pred_val = model.predict_proba(X_val)[:, 1]
+auc = roc_auc_score(y_val, pred_val)
+print(f"✅ 模型验证集 AUC 分数: {auc:.4f}")
+
+# 9. 对测试集预测并生成提交文件
+final_preds = model.predict_proba(X_test)[:, 1]
+# 做个微小裁剪防止超出边界
+final_preds = np.clip(final_preds, 0.001, 0.999)
+
+submission = pd.DataFrame({
+    'id': test['id'],
+    'Exited': final_preds
+})
+
+submission.to_csv('submission.csv', index=False)
+print("🎉 大功告成！提交文件 'submission.csv' 已生成在项目文件夹中！")
