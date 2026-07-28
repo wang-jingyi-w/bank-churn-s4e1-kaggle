@@ -1,0 +1,12 @@
+# 数据集
+data/**/*.csv
+# 输出文件
+output/**
+# python缓存
+__pycache__/
+*.pyc
+# jupyter缓存
+.ipynb_checkpoints/
+# 环境
+venv/
+*.env
